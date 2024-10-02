@@ -6,12 +6,12 @@ import sys
 import queue
 import os
 
-# Cores ANSI mais suaves
-COLOR_OK = "\033[32m"  # Verde
-COLOR_FORBIDDEN = "\033[33m"  # Amarelo mais suave
-COLOR_RESET = "\033[0m"  # Reseta a cor
+# Lighter ANSI colors
+COLOR_OK = "\033[32m"  # Green
+COLOR_FORBIDDEN = "\033[33m"  # Softer yellow
+COLOR_RESET = "\033[0m"  # Resets color
 
-# Função para exibir o texto e o símbolo do pinguim
+# Function to display the banner and penguin symbol
 def display_intro():
     result = pyfiglet.figlet_format("S4V10R")
     print(result)
@@ -26,72 +26,72 @@ def display_intro():
     """)
     print("\n")
 
-# Função para verificar uma URL e retornar se novos subdiretórios foram encontrados
+# Function to check a URL and return if new subdirectories are found
 def check_single_url(ip, endpoint, checked_urls, output_file):
     url = f"{ip}/{endpoint}"
-    if url in checked_urls:  # Ignora URLs já verificadas
+    if url in checked_urls:  # Skips already checked URLs
         return False
 
     try:
         r = requests.get(url, timeout=1.5)
-        checked_urls.add(url)  # Adiciona URL ao conjunto de verificados
+        checked_urls.add(url)  # Adds URL to the set of checked ones
 
         if r.status_code == 200:
             message = f"{COLOR_OK}200 ==> OK: {url}{COLOR_RESET}"
             print(message)
             if output_file:
-                with open(output_file, 'a') as f:  # Salva em modo append
-                    f.write(f"200 ==> OK: {url}\n")  # Escreve a mensagem no arquivo sem cor
-            return True  # Retorna True se o subdiretório foi encontrado e é válido
+                with open(output_file, 'a') as f:  # Saves in append mode
+                    f.write(f"200 ==> OK: {url}\n")  # Writes the message without color
+            return True  # Returns True if the subdirectory is found and valid
         elif r.status_code == 403:
             message = f"{COLOR_FORBIDDEN}403 ==> FB: {url}{COLOR_RESET}"
             print(message)
             if output_file:
-                with open(output_file, 'a') as f:  # Salva em modo append
-                    f.write(f"403 ==> FB: {url}\n")  # Escreve a mensagem no arquivo sem cor
+                with open(output_file, 'a') as f:  # Saves in append mode
+                    f.write(f"403 ==> FB: {url}\n")  # Writes the message without color
             return False
     except requests.RequestException:
         return False
 
-# Função para verificar URLs usando um pool de threads e fila
+# Function to check URLs using a thread pool and queue
 def checkurl(ip, wordlist, num_threads, output_file):
     try:
         with open(wordlist, 'r') as file:
             base_endpoints = file.read().split()
 
             if num_threads == 0:
-                num_threads = 10  # Define um padrão de 10 threads se não for especificado
+                num_threads = 10  # Default to 10 threads if not specified
 
-            # Usando uma fila para controlar a quantidade de threads
+            # Using a queue to control the number of threads
             q = queue.Queue()
 
-            # Adiciona os endpoints à fila
+            # Add endpoints to the queue
             for endpoint in base_endpoints:
                 q.put(endpoint)
 
-            # Conjunto para URLs verificadas
+            # Set for checked URLs
             checked_urls = set()
-            # Lista para armazenar novos subdiretórios encontrados
+            # List to store newly found subdirectories
             found_directories = []
 
             while not q.empty() or found_directories:
-                if found_directories:  # Se houver novos subdiretórios encontrados, os adiciona à fila
+                if found_directories:  # If new subdirectories are found, add them to the queue
                     for directory in found_directories:
                         q.put(directory)
-                    found_directories.clear()  # Limpa a lista após adicionar à fila
+                    found_directories.clear()  # Clear the list after adding to the queue
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
                     futures = {executor.submit(check_single_url, ip, endpoint, checked_urls, output_file): endpoint for endpoint in list(q.queue)}
 
                     for future in concurrent.futures.as_completed(futures):
                         endpoint = futures[future]
-                        if future.result():  # Se a URL foi encontrada
+                        if future.result():  # If the URL was found
                             found_directories.append(endpoint)
 
-                # Aguarda até que todas as tarefas sejam concluídas
+                # Wait for all tasks to finish
                 q.join()
 
-            print("Nenhum novo subdiretório encontrado. Processo encerrado.")
+            print("No new subdirectories found. Process ended.")
 
     except FileNotFoundError:
         print("Wordlist path is invalid. Check your input and try again.")
@@ -116,9 +116,9 @@ if __name__ == "__main__":
         print("Error: The number of threads must be between 0 and 100.")
         sys.exit(1)
 
-    # Cria o arquivo de saída se não existir
+    # Creates the output file if it doesn't exist
     if args.output:
         if not os.path.exists(args.output):
-            open(args.output, 'w').close()  # Cria um novo arquivo vazio
+            open(args.output, 'w').close()  # Creates an empty new file
 
     checkurl(args.url, args.wordlist, args.threads, args.output)
